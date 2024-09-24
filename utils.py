@@ -8,7 +8,7 @@ import tensorflow as tf
 import numpy as np
 
 def estimate_mi_sandwich_bounds(encoder, 
-  dataset, evaluation_batch_size=1024, number_evaluation_batches=8):
+  dataset, eval_batch_size=1024, num_eval_batches=8):
   """Computes the upper and lower bounds of mutual information transmitted by an encoder, given the dataset.
   
   With X and U the random variables representing the data and the compressed
@@ -46,13 +46,13 @@ def estimate_mi_sandwich_bounds(encoder,
     # Expand dimensions to broadcast and compute the pairwise distances between
     # the sampled points and the centers of the conditional distributions
     sampled_u_values = tf.reshape(sampled_u_values, 
-     [evaluation_batch_size, 1, embedding_dimension])
-    mus = tf.reshape(mus, [1, evaluation_batch_size, embedding_dimension])
+     [eval_batch_size, 1, embedding_dimension])
+    mus = tf.reshape(mus, [1, eval_batch_size, embedding_dimension])
     distances_ui_muj = sampled_u_values - mus
     
-    normalized_distances_ui_muj = distances_ui_muj / tf.reshape(stddevs, [1, evaluation_batch_size, embedding_dimension])
+    normalized_distances_ui_muj = distances_ui_muj / tf.reshape(stddevs, [1, eval_batch_size, embedding_dimension])
     p_ui_cond_xj = tf.exp(-tf.reduce_sum(normalized_distances_ui_muj**2, axis=-1)/2. - \
-      tf.reshape(tf.reduce_sum(logvars, axis=-1), [1, evaluation_batch_size])/2.)
+      tf.reshape(tf.reduce_sum(logvars, axis=-1), [1, eval_batch_size])/2.)
     normalization_factor = (2.*np.pi)**(tf.cast(embedding_dimension, tf.float64)/2.)
     p_ui_cond_xj = p_ui_cond_xj / normalization_factor
     # InfoNCE (lower bound) is the diagonal terms over their rows, averaged
@@ -60,14 +60,14 @@ def estimate_mi_sandwich_bounds(encoder,
     avg_pui_cond_xj = tf.reduce_mean(p_ui_cond_xj, axis=1)
     infonce_lower = tf.reduce_mean(tf.math.log(p_ui_cond_xi/tf.reduce_mean(p_ui_cond_xj, axis=1)))
     # "Leave one out" (upper bound) is the same but without the diagonal term in the denom
-    p_ui_cond_xj *= (1. - tf.eye(evaluation_batch_size, dtype=tf.float64))
+    p_ui_cond_xj *= (1. - tf.eye(eval_batch_size, dtype=tf.float64))
     loo_upper = tf.reduce_mean(tf.math.log(p_ui_cond_xi/tf.reduce_mean(p_ui_cond_xj, axis=1)))
     return infonce_lower, loo_upper
 
   # number_evaluation_batches*evaluation_batch_size can be larger than the dataset 
   # We gain from re-sampling u even if we have seen the data point x before 
   bound_estimates = []
-  for batch_data in dataset.repeat().shuffle(evaluation_batch_size*10).batch(evaluation_batch_size).take(number_evaluation_batches):
+  for batch_data in dataset.repeat().shuffle(eval_batch_size*10).batch(eval_batch_size).take(num_eval_batches):
     bound_estimates.append(compute_batch(batch_data)) 
     
   return np.mean(np.stack(bound_estimates, 0), 0)

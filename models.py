@@ -7,7 +7,7 @@ Models:
 
 import tensorflow as tf
 import numpy as np
-import utils
+from . import utils
 
 class PositionalEncoding(tf.keras.layers.Layer):
   """Simple positional encoding layer, that appends to an input sinusoids of multiple frequencies.
@@ -105,7 +105,7 @@ class DistributedIBNet(tf.keras.Model):
     for feature_ind in range(self.number_features):
       emb_mus, emb_logvars = tf.split(self.feature_encoders[feature_ind](features_split[feature_ind]), 2, axis=-1)
 
-      emb_channeled = tf.random.normal(emb_mus.shape, mean=emb_mus, stddev=tf.exp(emb_logvars/2.))
+      emb_channeled = tf.random.normal(tf.shape(emb_mus), mean=emb_mus, stddev=tf.exp(emb_logvars/2.))
 
       feature_embeddings.append(emb_channeled)
       kl_divergence_channel = tf.reduce_mean(
